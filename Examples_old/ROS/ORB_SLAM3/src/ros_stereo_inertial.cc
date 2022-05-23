@@ -272,6 +272,7 @@ void ImageGrabber::SyncWithImu()
       std::chrono::milliseconds tSleep(1);
       std::this_thread::sleep_for(tSleep);
     }
+    else break;
   }
 }
 
