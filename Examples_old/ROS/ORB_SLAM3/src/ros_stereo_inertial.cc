@@ -200,11 +200,16 @@ void ImageGrabber::SyncWithImu()
   {
     cv::Mat imLeft, imRight;
     double tImLeft = 0, tImRight = 0;
+    double tImLeft_prev=0, tImRight_prev=0;
     if (!imgLeftBuf.empty()&&!imgRightBuf.empty()&&!mpImuGb->imuBuf.empty())
     {
       tImLeft = imgLeftBuf.front()->header.stamp.toSec();
       tImRight = imgRightBuf.front()->header.stamp.toSec();
 
+      if ((tImRight_prev - tImRight) == 0)
+      {
+        break;
+      }
       this->mBufMutexRight.lock();
       while((tImLeft-tImRight)>maxTimeDiff && imgRightBuf.size()>1)
       {
@@ -271,8 +276,9 @@ void ImageGrabber::SyncWithImu()
 
       std::chrono::milliseconds tSleep(1);
       std::this_thread::sleep_for(tSleep);
-    }
-    else break;
+      tImRight_prev = tImRight;
+      tImLeft_prev = tImLeft;
+    } 
   }
 }
 
