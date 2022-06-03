@@ -28,6 +28,7 @@
 #include<ros/ros.h>
 #include<cv_bridge/cv_bridge.h>
 #include<sensor_msgs/Imu.h>
+#include "std_msgs/Int16.h"
 
 #include<opencv2/core/core.hpp>
 
@@ -69,7 +70,14 @@ public:
     cv::Ptr<cv::CLAHE> mClahe = cv::createCLAHE(3.0, cv::Size(8, 8));
 };
 
-
+int rosBagDone=0;
+void rosBagDoneCallback(const std_msgs::Int16::ConstPtr& msg)
+{
+  if (msg->data == 1)
+    rosBagDone =1;
+  // else
+  //   rosBagDone=0;
+}
 
 int main(int argc, char **argv)
 {
@@ -141,11 +149,14 @@ int main(int argc, char **argv)
   ros::Subscriber sub_imu = n.subscribe("/imu", 1000, &ImuGrabber::GrabImu, &imugb); 
   ros::Subscriber sub_img_left = n.subscribe("/camera/left/image_raw", 100, &ImageGrabber::GrabImageLeft,&igb);
   ros::Subscriber sub_img_right = n.subscribe("/camera/right/image_raw", 100, &ImageGrabber::GrabImageRight,&igb);
+  ros::Subscriber sub_Bag_Done = n.subscribe("/flagROSBagDone",1,rosBagDoneCallback);
 
   std::thread sync_thread(&ImageGrabber::SyncWithImu,&igb);
 
   ros::spin();
-
+  SLAM.Shutdown();
+  SLAM.SaveTrajectoryEuRoC("CameraTrajectory.txt");
+  SLAM.SaveKeyFrameTrajectoryEuRoC("KeyFrameTrajectory.txt");
   return 0;
 }
 
@@ -200,16 +211,11 @@ void ImageGrabber::SyncWithImu()
   {
     cv::Mat imLeft, imRight;
     double tImLeft = 0, tImRight = 0;
-    double tImLeft_prev=0, tImRight_prev=0;
     if (!imgLeftBuf.empty()&&!imgRightBuf.empty()&&!mpImuGb->imuBuf.empty())
     {
       tImLeft = imgLeftBuf.front()->header.stamp.toSec();
       tImRight = imgRightBuf.front()->header.stamp.toSec();
 
-      if ((tImRight_prev - tImRight) == 0)
-      {
-        break;
-      }
       this->mBufMutexRight.lock();
       while((tImLeft-tImRight)>maxTimeDiff && imgRightBuf.size()>1)
       {
@@ -276,9 +282,13 @@ void ImageGrabber::SyncWithImu()
 
       std::chrono::milliseconds tSleep(1);
       std::this_thread::sleep_for(tSleep);
-      tImRight_prev = tImRight;
-      tImLeft_prev = tImLeft;
     } 
+    if (rosBagDone==1)
+    {
+      std::cout<<"**** break "<<rosBagDone<<std::endl;
+      rosBagDone =2;
+      break;
+    }
   }
 }
 
